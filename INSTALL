@@ -2,12 +2,13 @@
 
 # CHECK LIQUID Library
 str=$(ldconfig -p | grep libliquid)
-if [ -z "$str" -a "$str" == " " ]; then
+if [ -z "${str}" ]; then
 	echo "[INFO] Liquid library not found. Installing..."
-	(cd ~/Downloads; wget http://mirrors.kernel.org/ubuntu/pool/universe/l/liquid-dsp/libliquid1d_1.3.1-1_amd64.deb; dpkg -x libliquid1d_1.3.1-1_amd64.deb .)
-	(cd ~/Downloads; wget http://mirrors.kernel.org/ubuntu/pool/universe/l/liquid-dsp/libliquid-dev_1.3.1-1_amd64.deb; dpkg -x libliquid-dev_1.3.1-1_amd64.deb .)
-	(sudo cp  usr/lib/x86_64-linux-gnu/libliquid.* /usr/lib/x86_64-linux-gnu/)
-	(sudo cp -ar usr/include/liquid /usr/include/)
+	(cd /tmp; wget http://mirrors.kernel.org/ubuntu/pool/universe/l/liquid-dsp/libliquid1d_1.3.1-1_amd64.deb; dpkg -x libliquid1d_1.3.1-1_amd64.deb .)
+	(cd /tmp; wget http://mirrors.kernel.org/ubuntu/pool/universe/l/liquid-dsp/libliquid-dev_1.3.1-1_amd64.deb; dpkg -x libliquid-dev_1.3.1-1_amd64.deb .)
+	(cd /tmp; sudo cp usr/lib/x86_64-linux-gnu/libliquid.* /usr/lib/x86_64-linux-gnu/)
+	(cd /tmp; sudo cp -ar usr/include/liquid /usr/include/)
+	(sudo ldconfig)
 else
 	echo "[INFO] Found liquid library: " $str
 fi
@@ -16,9 +17,9 @@ fi
 str=$(ldconfig -p | grep libvolk)
 if [ -z "$str" -a "$str" == " " ]; then
 	echo "[INFO] Liquid VOLK not found. Installing..."
-	(cd ~/Downloads; git clone https://github.com/gnuradio/volk.git)
-	(cd ~/Downloads/volk; git checkout v1.4)
-	(cd ~/Downloads/volk; mkdir build; cd build; cmake ../; make -j 12; sudo make install; sudo ldconfig)
+	(cd /tmp; git clone https://github.com/gnuradio/volk.git)
+	(cd /tmp/volk; git checkout v1.4)
+	(cd /tmp/volk; mkdir build; cd build; cmake ../; make -j 12; sudo make install; sudo ldconfig)
 else
 	echo "[INFO] Found liquid library: " $str
 fi
@@ -38,8 +39,8 @@ MYPYTHONPATH="python"
 
 # CREATE PYTHON WRAPPER
 (swig -I$ROOT/$SRCPATH -python -c++ $SWIGPATH/lora.i)
-(cd $OBJPATH; g++ -fPIC -I$ROOT/$SRCPATH $(pkg-config --cflags --libs python2 volk) -I/usr/include/liquid -lliquid -c $ROOT/$SWIGPATH/lora_wrap.cxx $ROOT/$SRCPATH/decoder.cc)
-(g++ -shared -fPIC -o _lora.so -I$ROOT/$SRCPATH $ROOT/$OBJPATH/decoder.o $ROOT/$OBJPATH/lora_wrap.o /usr/lib/x86_64-linux-gnu/libliquid.so /usr/lib/x86_64-linux-gnu/libvolk.so)
+(cd $OBJPATH; g++ -std=c++11 -fPIC -I$ROOT/$SRCPATH $(pkg-config --cflags --libs python2 volk) -I/usr/include/liquid -lliquid -c $ROOT/$SWIGPATH/lora_wrap.cxx $ROOT/$SRCPATH/decoder.cc)
+(g++ -shared -fPIC -o _lora.so -I$ROOT/$SRCPATH $ROOT/$OBJPATH/decoder.o $ROOT/$OBJPATH/lora_wrap.o /usr/lib/x86_64-linux-gnu/libliquid.so /usr/local/lib/libvolk.so)
 
 (mv $ROOT/$SWIGPATH/lora.py $ROOT/$MYPYTHONPATH)
 (mv $ROOT/_lora.so $ROOT/$MYPYTHONPATH)
@@ -47,3 +48,6 @@ MYPYTHONPATH="python"
 echo "[INFO] PYTHON Wrapper ready under module 'lora'"
 echo "[INFO] The Python library has been installed under folder" $MYPYTHONPATH/
 echo "[INFO] To check it, please run \"python -c 'import lora'\""
+
+echo "[INFO] IMPORTANT - If facing any issues, first make sure swig 3.0.12 or above is installed"
+echo "[INFO]             To install it, please run ./install_swig_3-0-12"
