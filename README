@@ -1,0 +1,4 @@
+1. Initialize GNURadio submodules.
+2. Run the cbg_channelizer_file.py script, which stores the samples coming out of the channelizer gnuradio block.
+3. Compile the lora python module by running INSTALL.
+4. run the decoder script within python/ folder.

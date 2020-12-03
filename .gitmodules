@@ -1,0 +1,3 @@
+[submodule "ext/gr-lora"]
+	path = ext/gr-lora
+	url = https://github.com/Subhramoy/gr-lora.git
