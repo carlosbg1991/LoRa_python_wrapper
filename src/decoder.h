@@ -24,19 +24,6 @@ class decoder
 
 	private:
 		/**
-		*  \brief  **DecoderState** : Each state the LoRa decoder can be in.
-		*/
-		enum class DecoderState {
-		    DETECT,
-		    SYNC,
-		    FIND_SFD,
-		    PAUSE,
-		    DECODE_HEADER,
-		    DECODE_PAYLOAD,
-		    STOP
-		};
-
-		/**
 		*  \brief  Return the DecoderState as string for debugging purposes.
 		*
 		*  \param  s
@@ -54,8 +41,6 @@ class decoder
 		*          <br/>Only the sample rate and spreading factor are needed.
 		*          The other settings, like packet length and coding rate, are extracted from the (explicit) HDR.
 		*/
-		DecoderState            d_state;            ///< Holds the current state of the decoder (state machine).
-
 		std::vector<gr_complex> d_downchirp;        ///< The complex ideal downchirp.
 		std::vector<float>      d_downchirp_ifreq;  ///< The instantaneous frequency of the ideal downchirp.
 
@@ -105,6 +90,20 @@ class decoder
 		int32_t 	  d_fine_sync;
 
 	public:
+		/**
+		*  \brief  **DecoderState** : Each state the LoRa decoder can be in.
+		*/
+		enum class DecoderState {
+		    DETECT,
+		    SYNC,
+		    FIND_SFD,
+		    PAUSE,
+		    DECODE_HEADER,
+		    DECODE_PAYLOAD,
+		    STOP
+		};
+		DecoderState            d_state;            ///< Holds the current state of the decoder (state machine).
+
 		// extern void build_ideal_chirps(void);
 		decoder(float samp_rate, int sf);
 
@@ -127,13 +126,35 @@ class decoder
 		float sliding_norm_cross_correlate_upchirp(const float *samples_ifreq, const uint32_t window, int32_t *index);
 		uint32_t max_frequency_gradient_idx(const gr_complex *samples);
 		void deinterleave(const uint32_t ppm);
+		void decode(const bool is_header);
 		bool demodulate(const gr_complex *samples, const bool is_header);
 		void deshuffle(const uint8_t *shuffle_pattern, const bool is_header);
 		void dewhiten(const uint8_t *prng);
 		void hamming_decode(bool is_header);
 		void hamming_decode_soft(bool is_header);
 		void extract_data_only(bool is_header);
+		void set_abs_threshold(const float threshold);
 
+		void print_complex_pointers(const gr_complex* input, int size);
+		uint32_t get_d_samples_per_symbol();
+		int32_t get_d_fine_sync();
+		uint32_t get_d_delay_after_sync();
+		uint32_t get_d_decim_factor();
+		uint32_t get_d_number_of_bins();
+		std::vector<uint8_t> get_d_decoded();
+		void set_d_phdr(std::vector<uint8_t> d_decoded);
+		void clear_d_decoded();
+		void set_d_payload_length(uint32_t value);
+		loraphy_header_t get_d_phdr();
+
+
+		std::string logic_DETECT(const gr_complex * input);
+		std::string logic_SYNC(const gr_complex * input, int * i);
+		std::string logic_FIND_SFD(const gr_complex * input);
+		std::string logic_PAUSE();
+		std::string logic_DECODE_HEADER(const gr_complex * input);
+		std::string logic_DECODE_PAYLOAD(const gr_complex * input);
+		// void logic_STOP(const gr_complex * input, DecoderState * d_state);
 };
 
 #endif /* DECODER_H_ */ 

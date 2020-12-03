@@ -385,6 +385,30 @@ void decoder::deinterleave(const uint32_t ppm) {
 }
 
 
+void decoder::decode(const bool is_header) {
+    static const uint8_t shuffle_pattern[] = {5, 0, 1, 2, 4, 3, 6, 7};
+
+    // For determining shuffle pattern
+    //if (!is_header)
+    //    values_to_file("/tmp/before_deshuffle", &d_demodulated[0], d_demodulated.size(), 8);
+
+    deshuffle(shuffle_pattern, is_header);
+
+    // For determining whitening sequence
+    //if (!is_header)
+    //    values_to_file("/tmp/after_deshuffle", &d_words_deshuffled[0], d_words_deshuffled.size(), 8);
+
+    dewhiten(is_header ? gr::lora::prng_header : d_whitening_sequence);
+
+    //if (!is_header)
+    //    values_to_file("/tmp/after_dewhiten", &d_words_dewhitened[0], d_words_dewhitened.size(), 8);
+
+    hamming_decode(is_header);
+    //std::cout<< "Actual Payload extracted"<< std::endl; //comment by me
+    //std::cout<< "THE ENd"<< std::endl; //comment by me
+}
+
+
 
 bool decoder::demodulate(const gr_complex *samples, const bool is_header) {
     // DBGR_TIME_MEASUREMENT_TO_FILE("SFxx_method");
@@ -529,4 +553,254 @@ void decoder::extract_data_only(bool is_header) {
             d_decoded.push_back((d2 << 4u) | d1);
     }
     //std::cout<< "Data extracted in given bytes"<< std::endl; //comment by me
+}
+
+void decoder::set_abs_threshold(const float threshold) {
+    d_energy_threshold = gr::lora::clamp(threshold, 0.0f, 20.0f);
+    //std::cout<< "Absolute Threshold set"<< std::endl; //comment by me
+}
+
+void decoder::print_complex_pointers(const gr_complex* input, int size)
+{
+    for (int i=0; i<size; i++)
+        std::cout << "input["<<i<<"] = " << input[i] << std::endl;
+}
+
+uint32_t decoder::get_d_samples_per_symbol()
+{
+    return d_samples_per_symbol;
+}
+
+int32_t decoder::get_d_fine_sync()
+{
+    return d_fine_sync;
+}
+
+uint32_t decoder::get_d_delay_after_sync()
+{
+    return d_delay_after_sync;
+}
+
+uint32_t decoder::get_d_decim_factor()
+{
+    return d_decim_factor;
+}
+
+uint32_t decoder::get_d_number_of_bins()
+{
+    return d_number_of_bins;
+}
+
+std::vector<uint8_t> decoder::get_d_decoded()
+{
+    return d_decoded;
+}
+
+void decoder::set_d_phdr(std::vector<uint8_t> d_decoded)
+{
+    d_phdr.length = d_decoded[0];
+    d_phdr.crc_msn = d_decoded[1];
+    d_phdr.has_mac_crc = d_decoded[2];
+    d_phdr.cr = d_decoded[3];
+    d_phdr.crc_lsn = d_decoded[4];
+    d_phdr.reserved = d_decoded[5];
+}
+
+void decoder::clear_d_decoded()
+{
+    d_decoded.clear();
+}
+
+void decoder::set_d_payload_length(uint32_t value)
+{
+    d_payload_length = value;
+}
+
+loraphy_header_t decoder::get_d_phdr()
+{
+    return d_phdr;
+}
+
+
+std::string decoder::logic_DETECT(const gr_complex * input)
+{
+    float correlation = detect_preamble_autocorr(input, d_samples_per_symbol);
+    //std::cout<< "trying to detect preamble "<< std::endl; //comment by me
+
+    std::cout << correlation << std::endl;
+
+    if (correlation >= 0.90f) {
+        std::cout << correlation << std::endl;
+        std::cout<< "corr >= 0.90f preamble detected. Lora Frame starts .. "<< std::endl; //comment by me
+        #ifdef DEBUG
+            d_debug << "Ca: " << correlation << std::endl;
+        #endif
+        d_corr_fails = 0u;
+        std::cout<< "going to decoder state SYNC "<< std::endl; //comment by me
+        
+        // *d_state = DecoderState::SYNC;
+        return "SYNC";
+    }
+    else {
+        // *d_state = DecoderState::DETECT;
+        return "DETECT";
+    }
+}
+
+std::string decoder::logic_SYNC(const gr_complex * input, int * i)
+{
+    std::cout<< "going to detect upchirp "<< std::endl; //comment by me
+    detect_upchirp(input, d_samples_per_symbol, i);
+    //float cfo = experimental_determine_cfo(&input[i], d_samples_per_symbol);
+    //pmt::pmt_t kv = pmt::cons(pmt::intern(std::string("cfo")), pmt::from_double(cfo));
+    //message_port_pub(pmt::mp("control"), kv);
+
+    std::cout<< "going to decoder state FIND SFD "<< std::endl; //comment by me
+    return "FIND_SFD";
+}
+
+std::string decoder::logic_FIND_SFD(const gr_complex * input)
+{
+    std::cout << "going to detect downchirp " << std::endl; //comment by me
+    const float c = detect_downchirp(input, d_samples_per_symbol);
+    
+    #ifdef DEBUG
+        d_debug << "Cd: " << c << std::endl;
+    #endif
+
+    if (c > 0.96f) {
+        std::cout << " Sync success. Correlation result > 0.96f " << std::endl; //comment by me
+        #ifdef DEBUG
+            d_debug << "SYNC: " << c << std::endl;
+        #endif
+        // Debug stuff
+        samples_to_file("/tmp/sync", input, d_samples_per_symbol, sizeof(gr_complex));
+        std::cout <<"going to decode HEADER " << std::endl; //comment by me
+        
+        return "PAUSE";
+    } else {
+        if(c < -0.97f) {
+            std::cout << "correlation result < -0.97f" << std::endl; //comment by me
+            std::cout << "going to fine_sync" <<std::endl; //comment by me
+            fine_sync(input, d_number_of_bins-1, d_decim_factor * 4);
+        } else {
+            d_corr_fails++;
+            std::cout << "correlation failed " <<std::endl; //comment by me
+        }
+
+        if (d_corr_fails > 4u) {
+            std::cout << "Lost Sync. Going to detect next preamble " << std::endl; //comment by me
+            #ifdef DEBUG
+                d_debug << "Lost sync" << std::endl;
+            #endif
+            
+            return "DETECT";
+        } else{
+            return "FIND_SFD";
+        }
+    }
+}
+
+std::string decoder::logic_PAUSE()
+{
+    //std::cout << "pausing before going to decode HEADER " << std::endl; //comment by me
+    return "DECODE_HEADER";
+    //std::cout<< "case:pause end"<< std::endl; //comment by me
+}
+
+
+std::string decoder::logic_DECODE_HEADER(const gr_complex * input)
+{
+    d_phdr.cr = 4u;
+    std::cout << "Trying to decode header " << std::endl; //comment by me
+    if (demodulate(input, true)) {
+        decode(true);
+        std::cout << "Demod and decode of header success. Printing header " << std::endl; //comment by me
+        gr::lora::print_vector_hex(std::cout, &d_decoded[0], d_decoded.size(), false);
+        uint32_t len_tap = sizeof(loratap_header_t); //by me 
+                                uint32_t len_phy = sizeof(loraphy_header_t); //by me
+                                //samples_to_file("/home/dell/Downloads/gr-lora-0.6.2/lib/interdigital2b", &input[i-500], 1000, sizeof(gr_complex));//by me
+                                samples_to_file("/home/dell/Downloads/gr-lora-0.6.2/lib/header/data-09-2", &input[len_tap], len_phy, sizeof(gr_complex));//by me
+        std::cout << "Tap Header Length ="<< len_tap << std::endl;
+        std::cout << "Phy Header Length ="<< len_phy << std::endl;
+        std::cout << "Tap Header Length ="<< len_tap << std::endl;
+        //step1 = &d_decoded; by me
+        //int step2 = d_decoded; by me
+        //std::cout << "d_decoded" << d_decoded[0] << std::endl; //by me 
+        //std::cout << "step2" << step2 << std::endl; //by me
+        memcpy(&d_phdr, &d_decoded[0], sizeof(loraphy_header_t));
+        std::cout << "d_phdr" << &d_phdr << std::endl; //by me 
+        d_decoded.clear();
+
+        d_payload_length = d_phdr.length + MAC_CRC_SIZE * d_phdr.has_mac_crc;
+        //std::cout << "corresponding payload length " << d_payload_length << std::endl; //comment by me
+        //d_phy_crc = SM(decoded[1], 4, 0xf0) | MS(decoded[2], 0xf0, 4);
+        uint32_t len1 = sizeof(loratap_header_t) + sizeof(loraphy_header_t); //+ d_payload_length;
+        std::cout << "Length of Lora packet: "<< len1 << std::endl; //comment by me
+
+        // Calculate number of payload symbols needed
+        uint8_t redundancy = (d_sf > 10 ? 2 : 0);
+        const int symbols_per_block = d_phdr.cr + 4u;
+        const float bits_needed     = float(d_payload_length) * 8.0f;
+        const float symbols_needed  = bits_needed * (symbols_per_block / 4.0f) / float(d_sf - redundancy);
+        const int blocks_needed     = (int)std::ceil(symbols_needed / symbols_per_block);
+        d_payload_symbols     = blocks_needed * symbols_per_block;
+        int size_payload = sizeof(d_payload_length);
+        //std::cout << "Size in Bytes of payload = " << size_payload << "bytes" << std::endl; //comment by me
+        std::cout << "  Payload length and payload symbols " << std::endl; //comment by me
+        std::cout << "LEN: " << d_payload_length << " (" << d_payload_symbols << " symbols)" << std::endl; //comment by me
+        #ifdef DEBUG
+            d_debug << "LEN: " << d_payload_length << " (" << d_payload_symbols << " symbols)" << std::endl;
+        #endif
+        std::cout << "going to decode PAYLOAD " << std::endl; //comment by me
+        
+        return "DECODE_PAYLOAD";
+    } 
+    else { 
+        std::cout << "Could not decode header " << std::endl; //comment by me
+        return "DECODE_HEADER";
+    }
+
+    //std::cout<< "case:decode_header end"<< std::endl; //comment by me
+}
+
+
+std::string decoder::logic_DECODE_PAYLOAD(const gr_complex * input)
+{
+    //**************************************************************************
+    // Failsafe if decoding length reaches end of actual data == noise reached?
+    // Could be replaced be rejecting packets with CRC mismatch...
+    if (std::abs(input[0]) < d_energy_threshold) {
+        std::cout << " input has energy lower than threshold. End of data. payload length in HDR is wrong " << std::endl; //comment by me 
+        //printf("\n*** Decode payload reached end of data! (payload length in HDR is wrong)\n");
+        d_payload_symbols = 0;
+    }
+    //**************************************************************************
+
+    if (demodulate(input, false)) {
+        d_payload_symbols -= (4u + d_phdr.cr);
+
+        if (d_payload_symbols <= 0) {
+            decode(false);
+            //std::cout << "demod and decode of payload success. Printing .. " << std::endl; //comment by me
+            d_payload_length = d_phdr.length + MAC_CRC_SIZE * d_phdr.has_mac_crc;//by me
+            uint32_t len1 = sizeof(loratap_header_t) + sizeof(loraphy_header_t) + d_payload_length;//by me
+            uint32_t duration = len1 - 500; //by me
+            samples_to_file("/home/dell/Downloads/gr-lora-0.6.2/lib/eop/data-09-2", &input[len1-21], 1000, sizeof(gr_complex));//by me
+            gr::lora::print_vector_hex(std::cout, &d_decoded[0], d_payload_length, true);
+            gr::lora::dev_address(std::cout, &d_decoded[0],true);//DevAddress
+            // msg_lora_frame();  // msg is for gnuradio
+            std::cout << "d_payload_length:" << d_payload_length<< std::endl; //comment by me
+            //gr::lora::print_vector_hex(std::cout << "Array of words deshuffled" << d_words_deshuffled[1]);//<< std::endl;
+            //std::cout<< "DevAddress above"<< std::endl;
+            std::cout << "End of Lora Packet. going back to detecting preamble " << std::endl; //comment by me
+            //samples_to_file("/home/dell/Downloads/gr-lora-0.6.2/lib/interdigital3d", &input[0], 1000, sizeof(gr_complex));//by me doesn't quit terminal
+            d_decoded.clear();
+
+            return "DETECT";
+        }
+    }
+
+    return "DECODE_PAYLOAD";
+    //std::cout<< "case:decode_payload end"<< std::endl; //comment by me
 }
