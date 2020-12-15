@@ -37,17 +37,41 @@ MYPYTHONPATH="python"
 ([ -d $OBJPATH ] || mkdir $OBJPATH)
 ([ -d $MYPYTHONPATH ] || mkdir $MYPYTHONPATH)
 
-# CREATE PYTHON WRAPPER
+# TEST NEW LORA MODULE
+# add (-D _DEBUG) as g++ input flags to activate LOGS (g++ ... -D _DEBUG ...)
 (swig -I$ROOT/$SRCPATH -python -c++ $SWIGPATH/lora.i)
-(cd $OBJPATH; g++ -std=c++11 -fPIC -I$ROOT/$SRCPATH $(pkg-config --cflags --libs python2 volk) -I/usr/include/liquid -lliquid -c $ROOT/$SWIGPATH/lora_wrap.cxx $ROOT/$SRCPATH/decoder.cc)
-(g++ -shared -fPIC -o _lora_id.so -I$ROOT/$SRCPATH $ROOT/$OBJPATH/decoder.o $ROOT/$OBJPATH/lora_wrap.o /usr/lib/x86_64-linux-gnu/libliquid.so /usr/local/lib/libvolk.so)
+(cd $OBJPATH; g++ -g -w -std=c++11 -fPIC -I$ROOT/$SRCPATH $(pkg-config --cflags --libs python2 volk) \
+	-I/usr/include/liquid -lliquid \
+	-c $ROOT/$SWIGPATH/lora_wrap.cxx \
+	$ROOT/$SRCPATH/decoder.cc \
+	$ROOT/$SRCPATH/channelizer.cc \
+	$ROOT/$SRCPATH/fractional_resampler.cc \
+	$ROOT/$SRCPATH/mmse_fir_interpolator.cc \
+	$ROOT/$SRCPATH/fir_filter.cc \
+	$ROOT/$SRCPATH/firdes.cc \
+	$ROOT/$SRCPATH/window.cc \
+	$ROOT/$SRCPATH/freq_xlating_fir_filter_ccf.cc \
+	)
+(g++ -g -shared -fPIC -o _lora_id.so \
+	-I$ROOT/$SRCPATH \
+	$ROOT/$OBJPATH/decoder.o \
+	$ROOT/$OBJPATH/channelizer.o \
+	$ROOT/$OBJPATH/fractional_resampler.o \
+	$ROOT/$OBJPATH/mmse_fir_interpolator.o \
+	$ROOT/$OBJPATH/fir_filter.o \
+	$ROOT/$OBJPATH/firdes.o \
+	$ROOT/$OBJPATH/window.o \
+	$ROOT/$OBJPATH/freq_xlating_fir_filter_ccf.o \
+	$ROOT/$OBJPATH/lora_wrap.o \
+	/usr/lib/x86_64-linux-gnu/libliquid.so \
+	/usr/local/lib/libvolk.so)
 
 (mv $ROOT/$SWIGPATH/lora_id.py $ROOT/$MYPYTHONPATH)
 (mv $ROOT/_lora_id.so $ROOT/$MYPYTHONPATH)
 
 echo "[INFO] PYTHON Wrapper ready under module 'lora_id'"
 echo "[INFO] The Python library has been installed under folder" $MYPYTHONPATH/
-echo "[INFO] To check it, please run \"python -c 'import lora_id'\""
+echo "[INFO] To check it, please run \" (cd python/; python -c 'import lora_id')\""
 
 echo "[INFO] IMPORTANT - If facing any issues, first make sure swig 3.0.12 or above is installed"
 echo "[INFO]             To install it, please run ./install_swig_3-0-12"

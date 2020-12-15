@@ -1,0 +1,97 @@
+import ctypes
+import os
+import sys
+import matplotlib.pyplot as plt
+import numpy as np
+import setproctitle as setPT
+import lora as lora_gr  # from GNURadio library
+from lora_id import *  # from InterDigital customized library
+from utils import *
+
+def read_complex_array(filePath):
+    f = open(filePath, 'rb')  # create file descriptor
+    x = np.fromfile(f, dtype=np.float32, count=-1)  # read data into long array
+    f.close()  # close file descriptor
+
+    y_real = x[0::2]  # real values
+    y_imag = x[1::2]  # imag values
+
+    # Reconstruct the original complex array
+    res = y_real + 1j * y_imag
+    return res
+
+def write_complex_array(data, filePath):
+    y = np.empty(2 * len(data), dtype=np.float32)
+    y[0::2] = data.real
+    y[1::2] = data.imag
+    y.astype(np.float32).tofile(filePath)
+    # data.astype('complex').tofile(filePath)
+
+
+if __name__ == '__main__':
+    setPT.setproctitle('lora-tester-channelizer-py')
+    print "Process name:  " + str(get_proc_name())
+    print "***********************************"
+
+    # ----------------------------------------------
+    # GDB ATTACH (DEBUGGING or performance monitoring)
+    # ----------------------------------------------
+    GDB_ATTACH = 0
+    if (GDB_ATTACH):
+        print ('Blocked waiting for GDB attach (pid = %d) ' % (os.getpid(),) + '. Press ENTER after GDB is attached.')
+        sys.stdout.flush()
+        raw_input()
+
+    # Read from dataset (returns numpy)
+    # dataset = read_complex_array("../data/lora_input.sigmf-data")  # before channelizer
+    dataset = read_complex_array("../data/lora-99-100.sigmf-data")  # before channelizer
+    fileName_out = '../data/py_lora_output_resampler'
+    len_dataset = len(dataset)
+    type_dataset = type(dataset)
+    print(len(dataset))
+    print(type(dataset))
+
+    my_channelizer = channelizer(10e6, 1e6, 902.5e6, [902.5e6])
+
+    MAC_CRC_SIZE = 2  # from utilities function
+    init_idx = 0
+    idx_chann_out = 0
+    d_corr_fails = 0
+    d_resampler_in_out_ratio = my_channelizer.get_resampler_in_out_ratio()
+    d_resampler_nTaps = my_channelizer.get_resampler_nTaps()
+    d_resampler_samples_per_batch = 1000000
+    d_batch = d_resampler_samples_per_batch*d_resampler_in_out_ratio + d_resampler_nTaps
+    d_batch = len_dataset - 1
+
+    my_gr_in = new_grcomplex(d_batch)  # Store samples in gr_complex* (or std::vector<float>*)
+    my_gr_out = new_grcomplex(d_batch / d_resampler_in_out_ratio)  # Store samples in gr_complex* (or std::vector<float>*)
+
+    my_gr_chann_out = new_grcomplex(len(dataset)/d_resampler_in_out_ratio)  # Store samples in gr_complex* (or std::vector<float>*)
+    py_chann_out = np.empty(len_dataset/d_resampler_in_out_ratio, dtype=complex)
+
+    while (init_idx + d_batch < len_dataset):
+        # plt.clf()
+        # plt.plot(np.real(dataset[init_idx:init_idx + d_samples_per_symbol]), linewidth=0.5)
+        # plt.plot(np.imag(dataset[init_idx:init_idx + d_samples_per_symbol]), linewidth=0.5)
+        # plt.show()
+
+        for idx_small in range(d_batch):
+            idx_dataset = init_idx + idx_small
+            set_grcomplex(my_gr_in, idx_small, complex(dataset[idx_dataset].real, dataset[idx_dataset].imag))
+
+        my_channelizer.work_resampler(my_gr_in, my_gr_out, d_batch / d_resampler_in_out_ratio)
+        init_idx = init_idx + d_batch
+
+        for idx_small in range(d_batch / d_resampler_in_out_ratio):
+            py_chann_out[idx_chann_out] = get_grcomplex(my_gr_out, idx_small)
+            idx_chann_out = idx_chann_out + 1
+
+    print "Length input (from USRP) samples {0}".format(len(dataset))
+    print "Actual Length output (of Channelizer/resampler) samples {0}".format(len(py_chann_out))
+    print "Writing output samples from the PyLoRa channelizer/resampler block in {0}".format(fileName_out)
+    write_complex_array(py_chann_out, fileName_out)
+
+    plt.figure()
+    plt.plot(np.real(py_chann_out), linewidth=0.5)
+    plt.plot(np.imag(py_chann_out), linewidth=0.5)
+    plt.show()

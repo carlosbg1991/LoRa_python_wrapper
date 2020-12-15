@@ -155,6 +155,8 @@ class decoder
 		std::string logic_DECODE_HEADER(const gr_complex * input);
 		std::string logic_DECODE_PAYLOAD(const gr_complex * input);
 		// void logic_STOP(const gr_complex * input, DecoderState * d_state);
+
+		int work(const gr_complex * input);
 };
 
 #endif /* DECODER_H_ */ 

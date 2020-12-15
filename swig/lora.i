@@ -36,6 +36,9 @@
     void set_grcomplex(std::complex<float>* input, int index, std::complex<float> value){
     	input[index] = value;
     }
+    void set_grcomplex_global(std::complex<float>* input, std::vector<std::complex<float>> vector_in){
+    	input[0] = vector_in[0];
+    }
     std::complex<float> get_grcomplex(std::complex<float>* input, int index){
     	return input[index];
     }
@@ -89,9 +92,14 @@
      wrapper file. We include the C header file necessary 
      to compile the interface */
     #include "decoder.h"
+    #include "channelizer.h"
+    #include "fractional_resampler.h"
 %} 
   
 /* explicitly list functions and variables to be interfaced
    or if we want to interface all functions then we can simply 
    include header file like this - %include "decoder.h" */
+%include "channelizer.h"
 %include "decoder.h"
+%include "fractional_resampler.h"
+
