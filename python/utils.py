@@ -2,6 +2,8 @@ import os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import pgrep
+
 
 def read_complex_array(filePath):
     f = open(filePath, 'rb')  # create file descriptor
@@ -13,11 +15,13 @@ def read_complex_array(filePath):
     res = y_real + 1j * y_imag
     return res
 
+
 def write_complex_array(data, filePath):
     y = np.empty(2*len(data), dtype=np.float32)
     y[0::2] = data.real
     y[1::2] = data.imag
     y.astype(np.float32).tofile(filePath)
+
 
 def plot_complex_array(filePath,title = "my plot"):
     data = read_complex_array(filePath)
@@ -27,17 +31,33 @@ def plot_complex_array(filePath,title = "my plot"):
     plt.title(title)
     plt.show()
 
+
 def plot_complex_array_compare(filePath1, filePath2):
     data1 = read_complex_array(filePath1)
     data2 = read_complex_array(filePath2)
     plt.figure()
-    plt.subplot(211)
+    plt.subplot(221)
     plt.plot(np.real(data1), linewidth=0.5)
+    plt.title('real',loc='left')
+    plt.xlabel('samples')
+    plt.ylabel('amplitude')
+    plt.subplot(223)
     plt.plot(np.real(data2), linewidth=0.5)
-    plt.subplot(212)
+    plt.title('real',loc='left')
+    plt.xlabel('samples')
+    plt.ylabel('amplitude')
+    plt.subplot(222)
     plt.plot(np.imag(data1), linewidth=0.5)
+    plt.title('imag',loc='left')
+    plt.xlabel('samples')
+    plt.ylabel('amplitude')
+    plt.subplot(224)
     plt.plot(np.imag(data2), linewidth=0.5)
+    plt.title('imag',loc='left')
+    plt.xlabel('samples')
+    plt.ylabel('amplitude')
     plt.show()
+
 
 def set_procname(newname):
     from ctypes import cdll, byref, create_string_buffer
@@ -47,6 +67,7 @@ def set_procname(newname):
     libc.prctl(15, byref(buff), 0, 0,
                0)  # Refer to "#define" of "/usr/include/linux/prctl.h" for the misterious value 16 & arg[3..5] are zero as the man page says.
 
+
 def get_proc_name():
     from ctypes import cdll, byref, create_string_buffer
     libc = cdll.LoadLibrary('libc.so.6')
@@ -54,3 +75,8 @@ def get_proc_name():
     # 16 == PR_GET_NAME from <linux/prctl.h>
     libc.prctl(16, byref(buff), 0, 0, 0)
     return buff.value
+
+
+def get_proc_pid(proc_name):
+    return pgrep.pgrep(proc_name)[0]
+

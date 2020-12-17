@@ -1,4 +1,10 @@
 /* file : lora.i */
+/* -*- Python -*- #
+*
+* Copyright 2020 Carlos Bocanegra.
+* The Genesys Lab, Northeastern University, Boston, MA
+*
+*/
   
 /* name of module to use*/
 %module lora_id

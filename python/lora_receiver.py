@@ -1,3 +1,10 @@
+# -*- Python -*- #
+#
+# Copyright 2020 Carlos Bocanegra.
+# The Genesys Lab, Northeastern University, Boston, MA
+#
+#
+
 import ctypes
 import os
 import sys
@@ -7,6 +14,8 @@ import setproctitle as setPT
 import lora as lora_gr  # from GNURadio library
 from lora_id import *  # from InterDigital customized library
 from utils import *
+import optparse
+import pgrep
 
 
 def run_channelizer_resampler(channelizer, filename_in, filename_out):
@@ -94,15 +103,46 @@ def run_decoder(decoder, filename_in):
 
 
 if __name__ == '__main__':
-    setPT.setproctitle('lora-decoder')
+
+    print "Running script: {0}".format(" ".join([x for x in sys.argv]))
+    setPT.setproctitle('lora-receiver')
     print "Process name:  " + str(get_proc_name())
-    print "***********************************"
+    print "Process PID:  " + str(get_proc_pid(get_proc_name()))
+    print "*****************************************"
 
-    channelizer = channelizer(10e6, 1e6, 902.5e6, [902.5e6])
-    decoder = decoder(1e6, 7)
-    decoder.set_abs_threshold(0.01)
+    print "To assess the performance, run the following command on a side terminal"
+    print ">> PID={0}".format(get_proc_pid(get_proc_name()))
+    print ">> htop -p `pstree -p $PID | perl -ne 'push @t, /\((\d+)\)/g; END { print join \",\", @t }'`"
+    print "*****************************************"
 
-    file_in_resampler = "../data/lora-99-100.sigmf-data"
+    parser = optparse.OptionParser()
+    parser.add_option('-n', '--file', type="string", dest="FILENAME", help=" Input IQ file", default="../data/lora-99-100.sigmf-data")
+    parser.add_option('-r', '--adcin', type="float", dest="ADC_IN", help="Sampling Rate in Hz", default=10e6)
+    parser.add_option('-s', '--adcout', type="float", dest="ADC_OUT", help="Sampling rate after resampler in Hz", default=1e6)
+    parser.add_option('-f', '--freq', type="float", dest="FREQ", help="Center Frequency in Hz",default=902.5e6)
+    parser.add_option('-c', '--captfreq', type="string", dest="CAPTFREQ", help="Capture Frequency in Hz as a list, e.g., \"902.5e6,907.1e6\"", default="902.5e6")
+    parser.add_option('-k', '--sf', type="int", dest="SPREADFACT", help="Spreading Factor", default=7)
+    parser.add_option('-d', '--threshold', type="float", dest="THRESHOLD", help="Decision threshold for frame sync", default=0.01)
+    options, args = parser.parse_args()
+    file_in_resampler = options.FILENAME
+    ADC_IN = options.ADC_IN
+    ADC_OUT = options.ADC_OUT
+    FREQ = options.FREQ
+    CAPTFREQ = options.CAPTFREQ.split(",")
+    CAPTFREQ = [float(x) for x in CAPTFREQ]
+    SPREADFACT = options.SPREADFACT
+    THRESHOLD = options.THRESHOLD
+
+    print "Running LoRa receiver with configuration:"
+    for k in options.__dict__.keys():
+        print "\t{0}: {1}".format(k, options.__dict__[k])
+    print "*****************************************"
+
+    channelizer = channelizer(ADC_IN, ADC_OUT, FREQ, CAPTFREQ)
+    decoder = decoder(ADC_OUT, SPREADFACT)
+    decoder.set_abs_threshold(THRESHOLD)
+    print "*****************************************"
+
     file_out_resampler = "../data/py_lora_output_resampler"
     file_out_xlating = "../data/py_lora_output_xlating"
 
@@ -110,6 +150,6 @@ if __name__ == '__main__':
     run_channelizer_xlating(channelizer, file_out_resampler, file_out_xlating)
     run_decoder(decoder, file_out_xlating)
 
-    plot_complex_array("../data/lora-99-100.sigmf-data", "INPUT DATASET")
+    plot_complex_array(file_in_resampler, "INPUT DATASET")
     plot_complex_array("../data/py_lora_output_resampler", "AFTER RESAMPLER")
     plot_complex_array("../data/py_lora_output_xlating", "AFTER XLATING FIR FILTER")

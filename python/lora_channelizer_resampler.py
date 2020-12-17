@@ -1,3 +1,10 @@
+# -*- Python -*- #
+#
+# Copyright 2020 Carlos Bocanegra.
+# The Genesys Lab, Northeastern University, Boston, MA
+#
+#
+
 import ctypes
 import os
 import sys
@@ -7,25 +14,6 @@ import setproctitle as setPT
 import lora as lora_gr  # from GNURadio library
 from lora_id import *  # from InterDigital customized library
 from utils import *
-
-def read_complex_array(filePath):
-    f = open(filePath, 'rb')  # create file descriptor
-    x = np.fromfile(f, dtype=np.float32, count=-1)  # read data into long array
-    f.close()  # close file descriptor
-
-    y_real = x[0::2]  # real values
-    y_imag = x[1::2]  # imag values
-
-    # Reconstruct the original complex array
-    res = y_real + 1j * y_imag
-    return res
-
-def write_complex_array(data, filePath):
-    y = np.empty(2 * len(data), dtype=np.float32)
-    y[0::2] = data.real
-    y[1::2] = data.imag
-    y.astype(np.float32).tofile(filePath)
-    # data.astype('complex').tofile(filePath)
 
 
 if __name__ == '__main__':
@@ -43,7 +31,6 @@ if __name__ == '__main__':
         raw_input()
 
     # Read from dataset (returns numpy)
-    # dataset = read_complex_array("../data/lora_input.sigmf-data")  # before channelizer
     dataset = read_complex_array("../data/lora-99-100.sigmf-data")  # before channelizer
     fileName_out = '../data/py_lora_output_resampler'
     len_dataset = len(dataset)

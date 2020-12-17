@@ -1,3 +1,10 @@
+# -*- Python -*- #
+#
+# Copyright 2020 Carlos Bocanegra.
+# The Genesys Lab, Northeastern University, Boston, MA
+#
+#
+
 import ctypes
 import os
 import sys

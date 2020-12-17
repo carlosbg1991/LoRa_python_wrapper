@@ -1,4 +1,10 @@
 #!/bin/bash
+# -*- Bash -*- #
+#
+# Copyright 2020 Carlos Bocanegra.
+# The Genesys Lab, Northeastern University, Boston, MA
+#
+#
 
 # CHECK LIQUID Library
 str=$(ldconfig -p | grep libliquid)

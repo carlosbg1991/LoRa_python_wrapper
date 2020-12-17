@@ -14,6 +14,7 @@ The project is structured as follows:
 ## Installation
 
 The code has the following pre-requisites:
+
 * liquid: Software-Defined Radio Digital Signal Processing Library. See https://liquidsdr.org
 * volk: Vector-Optimized Library of Kernels (VOLK). See http://libvolk.org.
 * swig: Simplified Wrapper and Interface Generator (SWIG). See http://www.swig.org/.
@@ -40,9 +41,32 @@ This creates the library (.so) and the python API and places them under folder *
 
 To run the LoRa receiver using a sample input of IQ samples, use the script *python/lora_receiver.py*. This iterates over the three main DSP blocks (resampler, xlating FIR filter and decoder). The first two blocks form the so-called channelizer block. The execution prints out the decoded header and payloads in hexadecimal values.
 
+The LoRa receiver script accepts input parameters to configure the environment. Make sure to set them up according to your input samples, i.e., expected center frequency, frequency shift, sampling rate, etc. For instance, the command below runs the LoRa receiver with the default PHY configuration to decode the packates from the pre-stored IQ samples in "../data/lora-99-100.sigmf-data".
+
 ```Source
- Process name:  lora-decoder
-***********************************
+python lora_receiver.py --file "../data/lora-99-100.sigmf-data"
+```
+
+This command generates the following output on the console:
+
+```Source
+Running script: lora_receiver.py --file ../data/lora-99-100.sigmf-data
+Process name: lora-receiver
+Process PID: 9974
+*****************************************
+To assess the performance, run the following command on a side terminal
+>> PID=9974
+>> htop -p `pstree -p $PID | perl -ne 'push @t, /\((\d+)\)/g; END { print join ",", @t }'`
+*****************************************
+Running LoRa receiver with configuration:
+  ADC_OUT: 1000000.0
+  SPREADFACT: 7
+  ADC_IN: 10000000.0
+  FILENAME: ../data/lora-99-100.sigmf-data
+  CAPTFREQ: 902.5e6
+  THRESHOLD: 0.01
+  FREQ: 902500000.0
+*****************************************
 [CHANNELIZER] - Creating Channelizer
 [FREQ XLATING FIR FILTER] - Creating Freq. XLating FIR Filter
 [FRACTIONAL RESAMPLER] - Creating Fractional Resampler
@@ -56,26 +80,20 @@ Bits (nominal) per symbol:  3.5
 Bins per symbol:  128
 Samples per symbol:   1024
 Decimation:     8
+*****************************************
 Running channelizer Resampler...
 Writing output samples from the PyLoRa channelizer/resampler block in ../data/py_lora_output_resampler
 Running channelizer Xlating FIR Filter...
 Writing output samples from the PyLoRa channelizer/Xlating_FIR block in ../data/py_lora_output_xlating
 Running decoder...
-...
 Demod and decode of header success. Printing header 
  0c 30 a0
 Demod and decode of Payload success. Printing payload 
- c3 11 74 00 ef 55 00 00 00 00 00 00 00 00
+ c3 11 74 00 b6 55 00 00 00 00 00 00 00 00
 Demod and decode of header success. Printing header 
  0c 30 a0
 Demod and decode of Payload success. Printing payload 
- c3 11 74 00 ef 55 00 00 00 00 00 00 00 00
-Demod and decode of header success. Printing header 
- 0c 30 a0
-Demod and decode of Payload success. Printing payload 
- c3 11 74 00 ef 55 00 00 00 00 00 00 00 00
-Demod and decode of header success. Printing header 
- 0c 30 a0
+ c3 11 74 00 b6 55 00 00 00 00 00 00 00 00
 ...
 ```
 
