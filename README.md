@@ -37,6 +37,12 @@ This creates the library (.so) and the python API and places them under folder *
 (cd python; python -c "import lora_id; print(dir(lora_id)); print(lora_id.decoder(10e6,7)); print(lora_id.channelizer(10e6,1e6,905e6,[905e6]))")
 ```
 
+The Python scripts included in this folder make use of external Python packages. To make sure that your system has them, please run the command below:
+
+```Bash
+python -m pip install numpy matplotlib setproctitle pgrep optparse-pretty
+```
+
 ### Run LoRa receiver
 
 To run the LoRa receiver using a sample input of IQ samples, use the script *python/lora_receiver.py*. This iterates over the three main DSP blocks (resampler, xlating FIR filter and decoder). The first two blocks form the so-called channelizer block. The execution prints out the decoded header and payloads in hexadecimal values.

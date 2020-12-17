@@ -17,6 +17,8 @@ if [ -z "${str}" ]; then
 	(sudo ldconfig)
 else
 	echo "[INFO] Found liquid library: " $str
+	DIRLIQUID=$(ldconfig -p | grep libliquid.so | tr ' ' '\n' | grep / | rev | cut -d'/' -f2- | rev  | head -n 1)
+	echo "[INFO] Using Liquid install dir: " $DIRLIQUID
 fi
 
 # CHECK VOLK Library
@@ -28,6 +30,8 @@ if [ -z "$str" -a "$str" == " " ]; then
 	(cd /tmp/volk; mkdir build; cd build; cmake ../; make -j 12; sudo make install; sudo ldconfig)
 else
 	echo "[INFO] Found liquid library: " $str
+	DIRVOLK=$(ldconfig -p | grep libvolk.so | tr ' ' '\n' | grep / | rev | cut -d'/' -f2- | rev  | head -n 1)
+	echo "[INFO] Using Liquid install dir: " $DIRVOLK
 fi
 
 echo "[INFO] Creating PYTHON wrapper..."
@@ -69,8 +73,8 @@ MYPYTHONPATH="python"
 	$ROOT/$OBJPATH/window.o \
 	$ROOT/$OBJPATH/freq_xlating_fir_filter_ccf.o \
 	$ROOT/$OBJPATH/lora_wrap.o \
-	/usr/lib/x86_64-linux-gnu/libliquid.so \
-	/usr/local/lib/libvolk.so)
+	$DIRLIQUID/libliquid.so \
+	$DIRVOLK/libvolk.so)
 
 (mv $ROOT/$SWIGPATH/lora_id.py $ROOT/$MYPYTHONPATH)
 (mv $ROOT/_lora_id.so $ROOT/$MYPYTHONPATH)

@@ -5,17 +5,12 @@
 #
 #
 
-import ctypes
-import os
 import sys
-import matplotlib.pyplot as plt
-import numpy as np
 import setproctitle as setPT
 import lora as lora_gr  # from GNURadio library
 from lora_id import *  # from InterDigital customized library
 from utils import *
 import optparse
-import pgrep
 
 
 def run_channelizer_resampler(channelizer, filename_in, filename_out):
